@@ -315,7 +315,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         audio_filename = f"{ts}_{sender}.ogg"
         url = upload_file(service, tmp_path, audio_filename, tg_folder_id, "audio/ogg")
 
-        label = f"{audio_filename} — {url}" + (f" — {caption}" if caption else "")
+        label = audio_filename + (f" — {caption}" if caption else "")
         entry = make_entry(user, "audio", label)
         append_to_feedback_file(service, root_id, cycle, entry)
 
@@ -350,7 +350,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         img_filename = f"{ts}_{sender}.jpg"
         url = upload_file(service, tmp_path, img_filename, tg_folder_id, "image/jpeg")
 
-        label = f"{img_filename} — {url}" + (f" — {caption}" if caption else "")
+        label = img_filename + (f" — {caption}" if caption else "")
         entry = make_entry(user, "imagem", label)
         append_to_feedback_file(service, root_id, cycle, entry)
         await message.reply_text(f"Imagem salva no {cycle_folder_name(cycle)}.")
@@ -386,7 +386,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         filename = f"{ts}_{sender}_{slugify(Path(original).stem)}.{ext}"
         url = upload_file(service, tmp_path, filename, tg_folder_id, doc.mime_type)
 
-        label = f"{filename} — {url}" + (f" — {caption}" if caption else "")
+        label = filename + (f" — {caption}" if caption else "")
         entry = make_entry(user, "documento", label)
         append_to_feedback_file(service, root_id, cycle, entry)
         await message.reply_text(f"Documento salvo no {cycle_folder_name(cycle)}.")
@@ -422,7 +422,7 @@ async def handle_audio(update: Update, context: ContextTypes.DEFAULT_TYPE):
         filename = f"{ts}_{sender}_{slugify(Path(original).stem)}.{ext}"
         url = upload_file(service, tmp_path, filename, tg_folder_id, audio.mime_type or "audio/mp4")
 
-        label = f"{filename} — {url}" + (f" — {caption}" if caption else "")
+        label = filename + (f" — {caption}" if caption else "")
         entry = make_entry(user, "audio", label)
         append_to_feedback_file(service, root_id, cycle, entry)
         await message.reply_text(f"Áudio salvo no {cycle_folder_name(cycle)}.")
