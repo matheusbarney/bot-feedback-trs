@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Logs / runtime
+*.log
+bot.log
+*.pid
+
+# Secrets and local OAuth credentials
+.env
+.env.*
+token.json
+credentials.json
+service_account.json
+client_secret*.json
+*.secret.json
+
+# Local/editor files
+.DS_Store
+.vscode/
+.idea/
+
+# Archives/backups
+*.tar
+*.tar.gz
+*.zip
+*.bak
