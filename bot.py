@@ -49,7 +49,7 @@ def now() -> datetime:
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_TOKEN_HERE")
 ALLOWED_USER_IDS = []
-DRIVE_ROOT_FOLDER = "FeedbackTRS"
+DRIVE_ROOT_FOLDER = os.environ.get("DRIVE_ROOT_FOLDER", "FeedbackTRS")
 CYCLE_STATE_FILE = Path(__file__).parent / "ciclo_atual.json"
 # ─────────────────────────────────────────────
 # Logging
