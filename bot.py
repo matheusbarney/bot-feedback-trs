@@ -20,12 +20,16 @@ Setup:
 4. python bot.py
 """
 
+import asyncio
 import os
 import json
 import logging
+import subprocess
 import tempfile
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+
+import requests
 
 from telegram import Update, BotCommand, BotCommandScopeAllGroupChats, BotCommandScopeAllPrivateChats
 from telegram.ext import (
@@ -51,6 +55,8 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_TOKEN_HERE")
 ALLOWED_USER_IDS = []
 DRIVE_ROOT_FOLDER = os.environ.get("DRIVE_ROOT_FOLDER", "FeedbackTRS")
 CYCLE_STATE_FILE = Path(__file__).parent / "ciclo_atual.json"
+WHISPER_SERVER_URL = os.environ.get("WHISPER_SERVER_URL", "http://127.0.0.1:8080/inference")
+WHISPER_LANGUAGE = os.environ.get("WHISPER_LANGUAGE", "pt")
 # ─────────────────────────────────────────────
 # Logging
 # ─────────────────────────────────────────────
@@ -223,6 +229,45 @@ def slugify(text: str) -> str:
 
 
 # ─────────────────────────────────────────────
+# Transcrição (whisper-server / whisper.cpp, headless)
+# ─────────────────────────────────────────────
+
+def transcribe_audio(path: str) -> str | None:
+    """Transcreve um arquivo de áudio via whisper-server (whisper.cpp), local ou no servidor.
+
+    Converte para WAV 16kHz mono antes de enviar — e o formato que o servidor
+    espera. Retorna None em qualquer falha (ffmpeg ausente, servidor fora do
+    ar, resposta inesperada) em vez de propagar erro — a transcricao e um
+    complemento best-effort e nao pode derrubar o salvamento do audio em si.
+    """
+    wav_path = f"{path}.wav"
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", path, "-ar", "16000", "-ac", "1", wav_path],
+            capture_output=True, timeout=60, check=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        log.warning(f"[Transcricao] Falha ao converter '{path}' para wav: {e}")
+        return None
+
+    try:
+        with open(wav_path, "rb") as f:
+            resp = requests.post(
+                WHISPER_SERVER_URL,
+                files={"file": f},
+                data={"response_format": "json", "language": WHISPER_LANGUAGE},
+                timeout=120,
+            )
+        resp.raise_for_status()
+        return resp.json().get("text", "").strip() or None
+    except (requests.RequestException, ValueError) as e:
+        log.warning(f"[Transcricao] Falhou para '{path}': {e}")
+        return None
+    finally:
+        os.unlink(wav_path)
+
+
+# ─────────────────────────────────────────────
 # Handlers de comando
 # ─────────────────────────────────────────────
 
@@ -318,6 +363,20 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         label = audio_filename + (f" — {caption}" if caption else "")
         entry = make_entry(user, "audio", label)
         append_to_feedback_file(service, root_id, cycle, entry)
+
+        try:
+            transcript = await asyncio.to_thread(transcribe_audio, tmp_path)
+            if transcript:
+                transcript_filename = f"{ts}_{sender}.txt"
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as tf:
+                    tf.write(transcript)
+                    transcript_path = tf.name
+                try:
+                    upload_file(service, transcript_path, transcript_filename, tg_folder_id, "text/plain")
+                finally:
+                    os.unlink(transcript_path)
+        except Exception as e:
+            log.warning(f"[Transcricao] Erro ao salvar transcricao de '{audio_filename}': {e}")
 
         await message.reply_text(f"Áudio salvo no {cycle_folder_name(cycle)}.")
     except Exception as e:
