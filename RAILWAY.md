@@ -82,7 +82,31 @@ E manda uma mensagem de teste (texto e áudio) pro bot — se a transcrição
 funcionar, o log do serviço `bot` mostra o upload do `.ogg` seguido do
 `.txt` na mesma pasta, igual na validação local.
 
-## 4. Depois de validado
+## 4. Dimensionamento (RAM/CPU)
+
+Medido de verdade com `docker stats` local (dois containers, rede
+compartilhada), não é estimativa — relevante pro Eliseu confirmar a
+configuração do servidor do CIn, já que isso ficou em aberto na ata
+("confirmar a configuração real do servidor, quantos núcleos e quanta
+memória, porque a informação disponível é contraditória").
+
+| | Parado (idle) | Durante transcrição (pico) |
+|---|---|---|
+| **whisper-server** | ~520–546 MB | ~670 MB, CPU batendo ~390% (usa 4 threads simultâneos) |
+| **bot** | ~10–45 MB | sem variação relevante, sempre abaixo de 50 MB |
+
+Teste feito com áudios curtos (0.5s e 2.4s) — arquivo mais longo deve
+consumir mais RAM/CPU transitoriamente durante o processamento.
+
+**Recomendação pra passar pro Eliseu:**
+- **RAM**: 2 GB de margem de segurança pros dois serviços juntos (pico
+  real somado ficou em ~720 MB nos testes com áudio curto).
+- **CPU**: pelo menos **4 núcleos** disponíveis, pra transcrição não
+  filar com outras cargas do servidor — hoje o `whisper-server` está
+  configurado com `-t 4` (4 threads); dá pra reduzir se o servidor
+  tiver menos núcleo, só fica proporcionalmente mais lento.
+
+## 5. Depois de validado
 
 Só depois disso faz sentido levar pro Eliseu/infra do CIn — ele vai usar
 os mesmos dois Dockerfiles (ou a mesma lógica, se a infra do CIn não for
