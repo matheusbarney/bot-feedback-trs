@@ -40,6 +40,14 @@ prazo conhecido de quando isso acontece.
 - **`refinar_transcricao.sh <arquivo.txt>`** — corrige um arquivo só,
   imprime o resultado no stdout. Não mexe em Drive, não decide nada sobre
   onde salvar — só transforma texto.
+
+  **Importante:** o `claude -p` sem restrição roda como agente completo,
+  com acesso a ferramentas — testamos com dado real e ele alucinou
+  "metadados" que não existiam no texto e devolveu uma pergunta de
+  esclarecimento em vez da correção. O script já usa `--allowedTools ""`
+  e um `--system-prompt` customizado pra forçar um comportamento de
+  "ferramenta de texto", não de assistente de código — não tira essas
+  flags achando que é redundante.
 - **`refinar_pendentes.sh`** — o job de lote de verdade. Lista as
   transcrições do ciclo atual (reaproveita
   `.claude/skills/corrigir-transcricao/scripts/drive_transcricoes.py`),
