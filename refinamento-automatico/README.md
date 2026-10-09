@@ -21,11 +21,19 @@ navegador local (via túnel SSH ou só copiando o link). Depois disso a
 sessão fica salva em `~/.claude/` **daquela máquina**, e os scripts abaixo
 funcionam sem pedir login de novo.
 
-**Atenção:** essa sessão pode expirar (vimos isso na validação local:
-`Failed to authenticate: OAuth session expired`). Mesma categoria de risco
-que o token OAuth do Google Drive em modo Testing (ver `RAILWAY.md`) — vale
-monitorar e ter um processo pra renovar (`claude login` de novo) sem
-derrubar o job silenciosamente por dias.
+**Atenção:** essa sessão pode expirar — vimos exatamente esse erro
+(`Failed to authenticate: OAuth session expired and could not be
+refreshed`) ao testar o comando `claude -p` num ambiente sandbox separado,
+não neste servidor nem numa conta que o time controla. Não dá pra afirmar
+prazo nenhum (não sabemos a janela real de validade/renovação dessa sessão
+— só que a falha existe e é possível). O ponto prático, independente do
+prazo: é o tipo de falha que um cron job **não avisa sozinho** — se a
+sessão expirar de verdade um dia, `refinar_pendentes.sh` passa a falhar
+calado a cada execução, a menos que alguém monitore
+`/var/log/refinar-transcricao.log` ou configure um alerta. Mesma categoria
+de cuidado que o token OAuth do Google Drive em modo Testing (ver
+`RAILWAY.md`) — risco possível de autenticação expirar sem aviso, não um
+prazo conhecido de quando isso acontece.
 
 ## 2. Os dois scripts
 
