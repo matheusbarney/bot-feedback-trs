@@ -65,6 +65,55 @@ prazo conhecido de quando isso acontece.
 revisa a correção na hora), então pode espaçar mais se quiser economizar
 chamadas.
 
+## 4. Deploy real (CIn) — checklist pro Eliseu
+
+Tudo que foi validado até aqui usou uma pasta de teste no Drive ("Bot IACP
+Teste") e uma conta pessoal. Pra apontar pro SIMIMAPEAR de verdade
+(`FeedbackTRS`), falta:
+
+1. **Repositório e ambiente** — clonar o repo, criar venv, instalar
+   `requirements.txt`, igual ao setup local.
+
+2. **Credenciais do Drive — conta certa, não a de teste.** Precisa de um
+   `token.json`/`credentials.json` válidos pra uma conta com acesso real à
+   `FeedbackTRS` — idealmente a conta do GERAIA (como a D7 original já
+   previa), não a conta pessoal usada na validação. Mesmo fluxo de sempre:
+   OAuth client no Google Cloud, `auth_drive.py` uma vez.
+
+3. **`DRIVE_ROOT_FOLDER=FeedbackTRS`** no `.env` daquele servidor — **sem
+   aspas** (já pegamos esse bug aqui: aspas literais na variável fazem o
+   Drive procurar uma pasta chamada `"FeedbackTRS"` com aspas no nome, que
+   não existe). É essa variável, sozinha, que decide se tudo aponta pro
+   SIMIMAPEAR real ou pra qualquer pasta de teste.
+
+4. **`ciclo_atual.json` precisa refletir o ciclo real no momento do
+   deploy** — não necessariamente o valor que está commitado agora;
+   confirmar com o time qual é o ciclo vigente nessa hora.
+
+5. **Claude Code instalado e logado no servidor**:
+   ```bash
+   npm install -g @anthropic-ai/claude-code   # ou instalador equivalente
+   claude login
+   ```
+   Decidir de qual conta (Pro/Max/Team — idealmente do GERAIA, já que o
+   ponto todo é custo por assinatura, não por token da API).
+
+6. **Cron instalado** (se o CIn rodar algo tipo Debian/Ubuntu, geralmente
+   já vem; no Arch/CachyOS usado na validação local precisou instalar
+   `cronie` à parte) e o crontab configurado (seção 3 acima).
+
+7. **Cuidado com o `PATH`:** o fix em `refinar_transcricao.sh` assume
+   `claude` instalado em `~/.local/bin` (onde o instalador padrão coloca).
+   Se o Eliseu instalar diferente (outro usuário, outro gerenciador de
+   pacote), **o caminho no script precisa bater** com onde o binário
+   realmente ficou — conferir com `which claude` depois de instalar.
+
+8. **Monitoramento.** O Eliseu já está montando observabilidade pro
+   MAPEAR (aviso por Telegram quando cai) — vale plugar o log desse cron
+   (`/var/log/refinar-transcricao.log`) no mesmo mecanismo, já que tanto a
+   sessão do Claude quanto o token OAuth do Drive podem expirar
+   silenciosamente (ver seção 1 acima e `RAILWAY.md`).
+
 ## Em aberto
 
 - Quem revisa os `-corrigido.txt` e decide se substituem o original — não
