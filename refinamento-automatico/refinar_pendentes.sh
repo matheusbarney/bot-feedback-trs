@@ -13,6 +13,17 @@
 set -e
 
 REPO_ROOT=$(cd "$(dirname "$0")/.." && pwd)
+
+# Cron roda com ambiente minimo, sem herdar nada de sessao interativa —
+# sem isso, DRIVE_ROOT_FOLDER (e qualquer outra variavel do .env) fica
+# no default do codigo em vez do valor real, e o job falha calado
+# olhando a pasta errada no Drive.
+if [ -f "$REPO_ROOT/.env" ]; then
+    set -a
+    . "$REPO_ROOT/.env"
+    set +a
+fi
+
 DRIVE_SCRIPT="$REPO_ROOT/.claude/skills/corrigir-transcricao/scripts/drive_transcricoes.py"
 PY="$REPO_ROOT/venv/bin/python"
 REFINAR="$REPO_ROOT/refinamento-automatico/refinar_transcricao.sh"
