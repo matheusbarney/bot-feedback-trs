@@ -12,6 +12,11 @@
 # "Failed to authenticate: OAuth session expired ou nao configurada".
 set -e
 
+# Cron roda com PATH minimo (ex: /usr/bin:/bin), que normalmente nao
+# inclui onde o `claude` fica instalado (~/.local/bin) — sem isso, falha
+# com "claude: command not found", silencioso pra quem so olha o Drive.
+export PATH="$HOME/.local/bin:$PATH"
+
 if [ -z "$1" ]; then
     echo "Uso: $0 <arquivo_bruto.txt>" >&2
     exit 1
