@@ -57,6 +57,8 @@ DRIVE_ROOT_FOLDER = os.environ.get("DRIVE_ROOT_FOLDER", "FeedbackTRS")
 CYCLE_STATE_FILE = Path(__file__).parent / "ciclo_atual.json"
 WHISPER_SERVER_URL = os.environ.get("WHISPER_SERVER_URL", "http://127.0.0.1:8080/inference")
 WHISPER_LANGUAGE = os.environ.get("WHISPER_LANGUAGE", "pt")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+OPENAI_TRANSCRIBE_MODEL = os.environ.get("OPENAI_TRANSCRIBE_MODEL", "gpt-4o-transcribe")
 # ─────────────────────────────────────────────
 # Logging
 # ─────────────────────────────────────────────
@@ -229,17 +231,40 @@ def slugify(text: str) -> str:
 
 
 # ─────────────────────────────────────────────
-# Transcrição (whisper-server / whisper.cpp, headless)
+# Transcrição — GPT Transcribe (OpenAI) como motor primário, com
+# whisper-server (whisper.cpp local/servidor) como fallback
 # ─────────────────────────────────────────────
+#
+# Branch gpt-transcribe: inverte a prioridade do main (la o whisper.cpp
+# e o unico motor). Aqui, GPT Transcribe entra primeiro porque o teste
+# comparativo (ver comparativo-transcritor/RESULTADOS.md) mostrou melhor
+# qualidade em termos tecnicos e ~4x mais rapido. O whisper.cpp continua
+# disponivel como fallback — nao custa nada manter, e cobre o caso de
+# falha de rede/API/custo com a OpenAI sem derrubar a transcricao de
+# vez. Atencao: usar a API da OpenAI manda o audio pra fora da infra do
+# time, o que reabre a questao de privacidade da decisao D8 original —
+# essa troca precisa ser decidida pelo time, nao foi decidida aqui.
 
-def transcribe_audio(path: str) -> str | None:
-    """Transcreve um arquivo de áudio via whisper-server (whisper.cpp), local ou no servidor.
+def _transcrever_openai(path: str) -> str | None:
+    if not OPENAI_API_KEY:
+        return None
+    try:
+        with open(path, "rb") as f:
+            resp = requests.post(
+                "https://api.openai.com/v1/audio/transcriptions",
+                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+                data={"model": OPENAI_TRANSCRIBE_MODEL, "language": WHISPER_LANGUAGE},
+                files={"file": f},
+                timeout=120,
+            )
+        resp.raise_for_status()
+        return resp.json().get("text", "").strip() or None
+    except (requests.RequestException, ValueError) as e:
+        log.warning(f"[Transcricao] OpenAI falhou para '{path}': {e}")
+        return None
 
-    Converte para WAV 16kHz mono antes de enviar — e o formato que o servidor
-    espera. Retorna None em qualquer falha (ffmpeg ausente, servidor fora do
-    ar, resposta inesperada) em vez de propagar erro — a transcricao e um
-    complemento best-effort e nao pode derrubar o salvamento do audio em si.
-    """
+
+def _transcrever_whisper_cpp(path: str) -> str | None:
     wav_path = f"{path}.wav"
     try:
         subprocess.run(
@@ -261,10 +286,22 @@ def transcribe_audio(path: str) -> str | None:
         resp.raise_for_status()
         return resp.json().get("text", "").strip() or None
     except (requests.RequestException, ValueError) as e:
-        log.warning(f"[Transcricao] Falhou para '{path}': {e}")
+        log.warning(f"[Transcricao] whisper.cpp falhou para '{path}': {e}")
         return None
     finally:
         os.unlink(wav_path)
+
+
+def transcribe_audio(path: str) -> str | None:
+    """Transcreve um audio: GPT Transcribe (OpenAI) primeiro, whisper.cpp
+    como fallback. Retorna None se os dois falharem (ou se nenhum estiver
+    configurado) em vez de propagar erro — a transcricao e um complemento
+    best-effort e nao pode derrubar o salvamento do audio em si.
+    """
+    texto = _transcrever_openai(path)
+    if texto:
+        return texto
+    return _transcrever_whisper_cpp(path)
 
 
 # ─────────────────────────────────────────────
