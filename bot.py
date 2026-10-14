@@ -26,6 +26,7 @@ import json
 import logging
 import subprocess
 import tempfile
+import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -250,18 +251,31 @@ def transcribe_audio(path: str) -> str | None:
         log.warning(f"[Transcricao] Falha ao converter '{path}' para wav: {e}")
         return None
 
+    # Uma tentativa extra: o servidor HTTP embutido do whisper.cpp e leve,
+    # nao e algo robusto tipo nginx, e ja vimos conexao cair no meio sem
+    # nenhum erro do lado do servidor (nem log de "processing") — blip
+    # transitorio, nao falha de configuracao. Uma segunda tentativa cobre
+    # isso sem custo.
+    tentativas = 2
+    erro_final = None
     try:
-        with open(wav_path, "rb") as f:
-            resp = requests.post(
-                WHISPER_SERVER_URL,
-                files={"file": f},
-                data={"response_format": "json", "language": WHISPER_LANGUAGE},
-                timeout=120,
-            )
-        resp.raise_for_status()
-        return resp.json().get("text", "").strip() or None
-    except (requests.RequestException, ValueError) as e:
-        log.warning(f"[Transcricao] Falhou para '{path}': {e}")
+        for tentativa in range(1, tentativas + 1):
+            try:
+                with open(wav_path, "rb") as f:
+                    resp = requests.post(
+                        WHISPER_SERVER_URL,
+                        files={"file": f},
+                        data={"response_format": "json", "language": WHISPER_LANGUAGE},
+                        timeout=120,
+                    )
+                resp.raise_for_status()
+                return resp.json().get("text", "").strip() or None
+            except (requests.RequestException, ValueError) as e:
+                erro_final = e
+                if tentativa < tentativas:
+                    log.warning(f"[Transcricao] Tentativa {tentativa} falhou para '{path}': {e} — tentando de novo.")
+                    time.sleep(2)
+        log.warning(f"[Transcricao] Falhou para '{path}' após {tentativas} tentativas: {erro_final}")
         return None
     finally:
         os.unlink(wav_path)
